@@ -220,6 +220,17 @@ def generate_7shades(mem):
     palette_size = palette_pad_7shades(f_tmp, palette_size)
     print("palette_size", palette_size)
 
+    pattern_name_tables_start = f_tmp.getbuffer().nbytes
+    for layer_index, cel_chunk in sorted(cel_chunks.items(), key=itemgetter(0)):
+        tileset_chunk = tilesets[layers[layer_index].tileset_index]
+        x_cells = 64 // (tileset_chunk.tile_width // 8)
+        y_cells = 64 // (tileset_chunk.tile_height // 8)
+        pack_pattern_name_table(f_tmp, cel_chunk, x_cells, y_cells)
+        break
+    pattern_name_tables_end = f_tmp.getbuffer().nbytes
+    size_of_map_data = pattern_name_tables_end - pattern_name_tables_start
+    print("pattern_name_table_size", size_of_map_data)
+
     character_patterns_start = f_tmp.getbuffer().nbytes
     for tileset_index, tileset_chunk in sorted(tilesets.items(), key=itemgetter(0)):
         pack_character_patterns(f_tmp, tileset_chunk)
@@ -227,16 +238,6 @@ def generate_7shades(mem):
     character_patterns_end = f_tmp.getbuffer().nbytes
     size_of_cel_data = character_patterns_end - character_patterns_start
     print("character_patterns_size", size_of_cel_data)
-
-    pattern_name_tables_start = f_tmp.getbuffer().nbytes
-    for layer_index, cel_chunk in sorted(cel_chunks.items(), key=itemgetter(0)):
-        tileset_chunk = tilesets[layers[layer_index].tileset_index]
-        x_cells = 64 // (tileset_chunk.tile_width // 8)
-        y_cells = 64 // (tileset_chunk.tile_height // 8)
-        pack_pattern_name_table(f_tmp, cel_chunk, x_cells, y_cells)
-    pattern_name_tables_end = f_tmp.getbuffer().nbytes
-    size_of_map_data = pattern_name_tables_end - pattern_name_tables_start
-    print("pattern_name_table_size", size_of_map_data)
 
     tile_character_size = CHCTLA__N0CHSZ__2x2_CELL
     tile_color_mode = CHCTLA__N0CHCN__256_COLOR
@@ -254,9 +255,23 @@ def generate_7shades(mem):
         f.write(header)
         f.write(f_tmp.getvalue())
 
-with open(sys.argv[1], 'rb') as f:
-    buf = f.read()
-    mem = memoryview(buf)
+def read_input():
+    with open(sys.argv[1], 'rb') as f:
+        buf = f.read()
+        mem = memoryview(buf)
+    return mem
 
-#generate_separate_files(mem)
-generate_7shades(mem)
+if len(sys.argv) == 3:
+    mem = read_input()
+    generate_7shades(mem)
+elif len(sys.argv) == 2:
+    mem = read_input()
+    generate_separate_files(mem)
+else:
+    print(f"usage:")
+    print()
+    print("separated raw binaries")
+    print(f"  python {sys.argv[0]} input.aseprite")
+    print()
+    print("7shades output:")
+    print(f"  python {sys.argv[0]} input.aseprite output.bin")
