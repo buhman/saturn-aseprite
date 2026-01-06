@@ -210,7 +210,7 @@ def palette_pad_7shades(f_tmp, palette_size):
         assert False, palette_size
     return palette_size
 
-def generate_7shades(mem):
+def generate_7shades(mem, output_filename):
     tilesets, layers, palette, cel_chunks = parse_file(mem)
 
     f_tmp = io.BytesIO()
@@ -251,7 +251,7 @@ def generate_7shades(mem):
                             plane_size,
                             map_data)
 
-    with open("7shades.bin", "wb") as f:
+    with open(output_filename, "wb") as f:
         f.write(header)
         f.write(f_tmp.getvalue())
 
@@ -263,7 +263,7 @@ def read_input():
 
 if len(sys.argv) == 3:
     mem = read_input()
-    generate_7shades(mem)
+    generate_7shades(mem, sys.argv[2])
 elif len(sys.argv) == 2:
     mem = read_input()
     generate_separate_files(mem)
