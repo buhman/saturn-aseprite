@@ -27,23 +27,31 @@ def pack_bgr555(red, green, blue):
 
 # 2x2
 
-def pack_index_2word(y_flip, x_flip, id):
-    tile_id = id * 8
+def pack_index_2word(character_size, y_flip, x_flip, id):
+    tile_id = id * character_size
     assert tile_id < 0x7fff, tile_id
     pattern = (int(y_flip) << 31) | (int(x_flip) << 30) | tile_id
     return struct.pack(">I", pattern)
 
-def pack_index_1word(y_flip, x_flip, id):
-    tile_id = (id * 8) >> 2
+def pack_index_1word(character_size, y_flip, x_flip, id):
+    if character_size == 8:
+        # 2x2 cell
+        tile_id = (id * character_size) >> 2
+    elif character_size == 2:
+        # 1x1 cell
+        tile_id = (id * character_size) >> 0
+    else:
+        assert False, character_size
+
     assert tile_id < 0x3ff, tile_id
     pattern = (int(y_flip) << 11) | (int(x_flip) << 10) | tile_id
     return struct.pack(">H", pattern)
 
-def pack_index(y_flip, x_flip, id):
+def pack_index(character_size, y_flip, x_flip, id):
     if PNB == "2WORD":
-        return pack_index_2word(y_flip, x_flip, id)
+        return pack_index_2word(character_size, y_flip, x_flip, id)
     else:
-        return pack_index_1word(y_flip, x_flip, id)
+        return pack_index_1word(character_size, y_flip, x_flip, id)
 
 def pack_old_palette_chunk(old_palette_chunk):
     with open("palette.bin", "wb") as f:
@@ -66,10 +74,6 @@ def pack_palette(f, palette):
         assert False, type(palette)
 
 def pack_character_2x2(tileset_chunk, offset):
-    #tileset_chunk.number_of_tiles,
-    #tileset_chunk.tile_width,
-    #tileset_chunk.tile_height,
-
     assert tileset_chunk.tile_width == 16
     assert tileset_chunk.tile_height == 16
     assert type(tileset_chunk.data) == TilesetChunkInternal
@@ -115,7 +119,20 @@ def pack_character_patterns(f, tileset_chunk):
 
         f.write(buf)
 
-def pack_pattern_name_table(f, cel_chunk, x_cells, y_cells):
+def tileset_chunk_character_size(tileset_chunk):
+    # assumes 256 color
+    if tileset_chunk.tile_width == 8 and tileset_chunk.tile_height == 8:
+        return 2
+    elif tileset_chunk.tile_width == 16 and tileset_chunk.tile_height == 16:
+        return 8
+    else:
+        assert False, (tileset_chunk.tile_width, tileset_chunk.tile_height)
+
+def pack_pattern_name_table(f, cel_chunk, tileset_chunk):
+    x_cells = 64 // (tileset_chunk.tile_width // 8)
+    y_cells = 64 // (tileset_chunk.tile_height // 8)
+    character_size = tileset_chunk_character_size(tileset_chunk)
+
     assert type(cel_chunk.data) == CelChunk_CompressedTilemap
     #assert cel_chunk.data.width_in_number_of_tiles <= 64
     #assert cel_chunk.data.height_in_number_of_tiles <= 64
@@ -140,7 +157,7 @@ def pack_pattern_name_table(f, cel_chunk, x_cells, y_cells):
                     tx = (h_page * x_cells) + x
                     ty = (v_page * y_cells) + y
                     if tx >= tile_width or ty >= tile_height:
-                        f.write(pack_index(0, 0, 0))
+                        f.write(pack_index(0, 0, 0, 0))
                     else:
                         cel_chunk_ix = ty * tile_width + tx
                         tile_data = cel_chunk.data.tile[cel_chunk_ix]
@@ -149,7 +166,7 @@ def pack_pattern_name_table(f, cel_chunk, x_cells, y_cells):
                         x_flip = (tile_data & cel_chunk.data.bitmask_for_x_flip.value) != 0
                         y_flip = (tile_data & cel_chunk.data.bitmask_for_y_flip.value) != 0
 
-                        f.write(pack_index(y_flip, x_flip, tile_id))
+                        f.write(pack_index(character_size, y_flip, x_flip, tile_id))
 
 def generate_separate_files(mem):
     tilesets, layers, palette, cel_chunks = parse_file(mem)
@@ -166,15 +183,12 @@ def generate_separate_files(mem):
     for layer_index, cel_chunk in sorted(cel_chunks.items(), key=itemgetter(0)):
         #layers[layer_index]
         print(f"layer={layer_index} layer_name={layers[layer_index].layer_name} tileset={layers[layer_index].tileset_index}");
-        tileset_chunk = tilesets[layers[layer_index].tileset_index]
-
-        x_cells = 64 // (tileset_chunk.tile_width // 8)
-        y_cells = 64 // (tileset_chunk.tile_height // 8)
 
         filename = f"pattern_name_table__layer_{layer_index}.bin"
         print(filename)
         with open(filename, "wb") as f:
-            pack_pattern_name_table(f, cel_chunk, x_cells, y_cells)
+            tileset_chunk = tilesets[layers[layer_index].tileset_index]
+            pack_pattern_name_table(f, cel_chunk, tileset_chunk)
 
 PNCN0__N0PNB__2WORD = (0 << 15) # PNB_2WORD
 PNCN0__N0PNB__1WORD = (1 << 15) # PNB_1WORD
@@ -203,6 +217,17 @@ def header_7shades(size_of_cel_data, # bytes
     file_type_id = 0x5
     width = 1
     height = 1
+
+    print("7shades:\n"
+          f"  file_type_id: {file_type_id}\n"
+          f"  size_of_cel_data: {size_of_cel_data}\n"
+          f"  size_of_map_data: {size_of_map_data}\n"
+          f"  tile_character_size: {tile_character_size}\n"
+          f"  tile_color_mode: {tile_color_mode}\n"
+          f"  plane_size: {plane_size}\n"
+          f"  map_data: {map_data}\n"
+          f"  width: {width}\n"
+          f"  height: {height}\n")
 
     return struct.pack(">IIIIIIIHH",
                        file_type_id,
@@ -249,9 +274,7 @@ def generate_7shades(mem, output_filename):
     pattern_name_tables_start = f_tmp.getbuffer().nbytes
     for layer_index, cel_chunk in sorted(cel_chunks.items(), key=itemgetter(0)):
         tileset_chunk = tilesets[layers[layer_index].tileset_index]
-        x_cells = 64 // (tileset_chunk.tile_width // 8)
-        y_cells = 64 // (tileset_chunk.tile_height // 8)
-        pack_pattern_name_table(f_tmp, cel_chunk, x_cells, y_cells)
+        pack_pattern_name_table(f_tmp, cel_chunk, tileset_chunk)
         break
     pattern_name_tables_end = f_tmp.getbuffer().nbytes
     size_of_map_data = pattern_name_tables_end - pattern_name_tables_start
