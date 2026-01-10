@@ -168,6 +168,8 @@ def pack_pattern_name_table(f, cel_chunk, tileset_chunk):
 
                         f.write(pack_index(character_size, y_flip, x_flip, tile_id))
 
+    return h_pages, v_pages
+
 def generate_separate_files(mem):
     tilesets, layers, palette, cel_chunks = parse_file(mem)
 
@@ -261,6 +263,16 @@ def chctla_n0chsz(tileset_chunk):
     else:
         assert False, (tileset_chunk.tile_width, tileset_chunk.tile_height)
 
+def hv_pages_plsz(hv_pages):
+    if hv_pages == (1, 1):
+        return PLSZ__N0PLSZ__1x1
+    elif hv_pages == (2, 1):
+        return PLSZ__N0PLSZ__2x1
+    elif hv_pages == (2, 2):
+        return PLSZ__N0PLSZ__2x2
+    else:
+        assert False, hv_pages
+
 def generate_7shades(mem, output_filename):
     tilesets, layers, palette, cel_chunks = parse_file(mem)
 
@@ -274,7 +286,7 @@ def generate_7shades(mem, output_filename):
     pattern_name_tables_start = f_tmp.getbuffer().nbytes
     for layer_index, cel_chunk in sorted(cel_chunks.items(), key=itemgetter(0)):
         tileset_chunk = tilesets[layers[layer_index].tileset_index]
-        pack_pattern_name_table(f_tmp, cel_chunk, tileset_chunk)
+        hv_pages = pack_pattern_name_table(f_tmp, cel_chunk, tileset_chunk)
         break
     pattern_name_tables_end = f_tmp.getbuffer().nbytes
     size_of_map_data = pattern_name_tables_end - pattern_name_tables_start
@@ -290,7 +302,7 @@ def generate_7shades(mem, output_filename):
 
     tile_character_size = chctla_n0chsz(tileset_chunk)
     tile_color_mode = CHCTLA__N0CHCN__256_COLOR
-    plane_size = PLSZ__N0PLSZ__2x2
+    plane_size = hv_pages_plsz(hv_pages)
     map_data = PNCN0__N0PNB__2WORD if PNB == "2WORD" else PNCN0__N0PNB__1WORD
 
     header = header_7shades(size_of_cel_data,
