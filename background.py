@@ -53,10 +53,9 @@ def pack_index(character_size, y_flip, x_flip, id):
     else:
         return pack_index_1word(character_size, y_flip, x_flip, id)
 
-def pack_old_palette_chunk(old_palette_chunk):
-    with open("palette.bin", "wb") as f:
-        for color in old_palette_chunk.packets[0].colors:
-            f.write(pack_bgr555(*color))
+def pack_old_palette_chunk(f,old_palette_chunk):
+    for color in old_palette_chunk.packets[0].colors:
+        f.write(pack_bgr555(*color))
 
 def pack_palette_chunk(f, palette_chunk):
     assert palette_chunk.first_color_index_to_change == 0
