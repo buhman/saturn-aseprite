@@ -53,7 +53,7 @@ def pack_index(character_size, y_flip, x_flip, id):
     else:
         return pack_index_1word(character_size, y_flip, x_flip, id)
 
-def pack_old_palette_chunk(f,old_palette_chunk):
+def pack_old_palette_chunk(f, old_palette_chunk):
     for color in old_palette_chunk.packets[0].colors:
         f.write(pack_bgr555(*color))
 
